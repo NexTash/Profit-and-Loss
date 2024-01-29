@@ -35,7 +35,7 @@ def execute(filters=None):
 		ignore_closing_entries=True,
 		ignore_accumulated_values_for_fy=True,
 	) 
-	
+
 
 	expense = get_data(
 		filters.company,
@@ -59,53 +59,111 @@ def execute(filters=None):
 	group_accounts = [record for record in expense if record.get("indent") == 1.0]
 	direct_expenses = [r for r in expense if r.get("parent_account") == group_accounts[0].get("account")]
 	indirect_expenses = [r for r in expense if r.get("parent_account") == group_accounts[1].get("account")]
+	
+
+	amount_total_direct_expense=0
+	if len(direct_expenses)>1:
+		direct_expenses = [r for r in expense if r.get("parent_account") == group_accounts[0].get("account")]
+
+
+	amount_total_indirect_expense=0
+	if len(indirect_expenses)>1:
+		indirect_expenses = [r for r in expense if r.get("parent_account") == group_accounts[1].get("account")]
+	
+
 	# indirect_income and direct_income
 	group_income_accounts = [record for record in income if record.get("indent") == 1.0]
 	direct_income = [r for r in income if r.get("parent_account") == group_income_accounts[0].get("account")]
-	indirect_income="",
-	if len(group_income_accounts) > 1:
-		indirect_income = [r for r in income if r.get("parent_account") == group_income_accounts[1].get("")]
+	indirect_income = [r for r in income if r.get("parent_account") == group_income_accounts[1].get("account")]
+
+	amount_total_direct_income=0
+	if len(direct_income)>1:
+		direct_income = [r for r in income if r.get("parent_account") == group_income_accounts[0].get("account")]
 	
 
-	# calculation the all the direct and indirect account on income and exp baseaccount
-	amount_total_direct_expense = sum(int(amount.get('total')) for amount in direct_expenses)
-	amount_total_direct_income = sum(int(amount.get('total')) for amount in direct_income)
-	amount_total_indirect_expense = sum(int(amount.get('total')) for amount in indirect_expenses)
-	# amount_total_indirect_income = sum(int(amount['total']) for amount in indirect_income)
+	amount_total_indirect_income=0
+	if len(indirect_income) > 1:
+		indirect_income = [r for r in income if r.get("parent_account") == group_income_accounts[1].get("account")]
+		
 
 
+
+ 
+
+ 
+	
 #  calculating the value of direct_account indirect_accounts
-	direct_profit_and_loss=int(amount_total_direct_income)+int(amount_total_direct_expense)
-	# indirect_profit_and_loss=(amount_total_indirect_income)-(amount_total_indirect_expense)
+	amount_total_direct_income=0.0		
+	for amount in direct_income:
+		amount_total_direct_income+=amount.get('total')
+
+
+	amount_total_direct_expense=0.0			
+	for amount in direct_expenses:
+		amount_total_direct_expense+=amount.get('total')
+
+	
+	amount_total_indirect_income=0.0			
+	for amount in indirect_income:
+		amount_total_indirect_income+=amount.get('total')
+
+	amount_total_indirect_expense=0.0			
+	for amount in indirect_expenses:
+		amount_total_indirect_expense+=amount.get('total')
+
+
+		
+
+
+	direct_profit_and_loss=(amount_total_direct_income)+(amount_total_direct_expense)
+	indirect_profit_and_loss=(amount_total_indirect_income)+(amount_total_indirect_expense)
 
 
 # make key for header
 
 	income[0].account_name = ""
-	expense[0].account_name = "Indirect Incomes and Expenses"
+	expense[0].account_name = "Direct Incomes and Expenses"
 
-	direct_account = {'account_name': 'Direct Incomes and Expenses', 'jun_2024': direct_profit_and_loss}
+	direct_account = {'account_name': 'Gross Profit For Direct Incomes and Expenses', 'jun_2024': direct_profit_and_loss}
 	direct_profit_and_loss = {'indent': 0.0, 'currency': 'PKR', 'account_name': 'Direct Profit and Loss', 'jun_2024': direct_profit_and_loss, 'has_value': True, 'total': direct_profit_and_loss}
-# direct account in row view with all accounts
-	data.extend([direct_account] or [])
-	data.extend([group_accounts[0]] or [])
-	data.extend(direct_expenses or [])
-	data.extend([group_income_accounts[0]] or [])
-	data.extend(direct_income or [])
 
+
+
+
+
+	data.extend([direct_account] or [])
+			
+	if direct_expenses:
+		data.extend([group_accounts[0]] or [])
+		data.extend(direct_expenses or [])
+	if direct_income:
+		data.extend([group_income_accounts[0]] or [])
+		data.extend(direct_income or [])
+		# data.extend("Hello")
+	
 
 
 
 # direct account in row view with all accounts	
 	data.extend([direct_profit_and_loss] or [])
+
 	
+#in direct account in row view with all accounts
+	if indirect_expenses:
+		data.extend([group_accounts[1]] or [])
+		data.extend(indirect_expenses or [])
+	if indirect_income:
+		data.extend([group_income_accounts[1]] or [])
+		
+		data.extend(indirect_income or [])
+
+# whole year profit and loss
 
 
-	data.extend([group_accounts[1]] or [])
-	data.extend(indirect_expenses or [])
-	# data.extend([group_income_accounts[1]] or [])
-	# data.extend(indirect_income or [])
-	# data.extend([indirect_profit_and_loss] or [])
+
+
+
+
 	if net_profit_loss:
 		data.append(net_profit_loss)
 
@@ -230,3 +288,5 @@ def get_chart_data(filters, columns, income, expense, net_profit_loss):
 	chart["fieldtype"] = "Currency"
 
 	return chart
+
+
