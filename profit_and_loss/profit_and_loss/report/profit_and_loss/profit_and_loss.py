@@ -57,42 +57,28 @@ def execute(filters=None):
 	data = []
 	# direct_expenses and indirect_expenses
 	group_accounts = [record for record in expense if record.get("indent") == 1.0]
-	direct_expenses = [r for r in expense if r.get("parent_account") == group_accounts[0].get("account")]
-	indirect_expenses = [r for r in expense if r.get("parent_account") == group_accounts[1].get("account")]
 	
 
-	amount_total_direct_expense=0
-	if len(direct_expenses)>1:
+	if len(group_accounts)>1:
 		direct_expenses = [r for r in expense if r.get("parent_account") == group_accounts[0].get("account")]
 
-
-	amount_total_indirect_expense=0
-	if len(indirect_expenses)>1:
+	if len(group_accounts)>1:
 		indirect_expenses = [r for r in expense if r.get("parent_account") == group_accounts[1].get("account")]
 	
 
 	# indirect_income and direct_income
 	group_income_accounts = [record for record in income if record.get("indent") == 1.0]
-	direct_income = [r for r in income if r.get("parent_account") == group_income_accounts[0].get("account")]
-	indirect_income = [r for r in income if r.get("parent_account") == group_income_accounts[1].get("account")]
 
-	amount_total_direct_income=0
-	if len(direct_income)>1:
+	if len(group_accounts)>1:
 		direct_income = [r for r in income if r.get("parent_account") == group_income_accounts[0].get("account")]
 	
-
-	amount_total_indirect_income=0
-	if len(indirect_income) > 1:
+	if len(group_accounts) > 1:
 		indirect_income = [r for r in income if r.get("parent_account") == group_income_accounts[1].get("account")]
 		
 
 
 
- 
-
- 
-	
-#  calculating the value of direct_account indirect_accounts
+ #  calculating the value of direct_account indirect_accounts
 	amount_total_direct_income=0.0		
 	for amount in direct_income:
 		amount_total_direct_income+=amount.get('total')
@@ -139,7 +125,7 @@ def execute(filters=None):
 	if direct_income:
 		data.extend([group_income_accounts[0]] or [])
 		data.extend(direct_income or [])
-		# data.extend("Hello")
+	
 	
 
 
