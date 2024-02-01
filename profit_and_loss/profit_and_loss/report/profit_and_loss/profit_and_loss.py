@@ -34,8 +34,7 @@ def execute(filters=None):
 		accumulated_values=filters.accumulated_values,
 		ignore_closing_entries=True,
 		ignore_accumulated_values_for_fy=True,
-	) 
-
+	)
 
 	expense = get_data(
 		filters.company,
@@ -47,133 +46,126 @@ def execute(filters=None):
 		ignore_closing_entries=True,
 		ignore_accumulated_values_for_fy=True,
 	)
-
-
 	net_profit_loss = get_net_profit_loss(
 		income, expense, period_list, filters.company, filters.presentation_currency
 	)
-
-	
-	data = []
-	# direct_expenses and indirect_expenses
-	group_accounts = [record for record in expense if record.get("indent") == 1.0]
-	
-
-	if len(group_accounts)>1:
-		direct_expenses = [r for r in expense if r.get("parent_account") == group_accounts[0].get("account")]
-
-	if len(group_accounts)>1:
-		indirect_expenses = [r for r in expense if r.get("parent_account") == group_accounts[1].get("account")]
-	
-
-	# indirect_income and direct_income
-	group_income_accounts = [record for record in income if record.get("indent") == 1.0]
-
-	if len(group_accounts)>1:
-		direct_income = [r for r in income if r.get("parent_account") == group_income_accounts[0].get("account")]
-	
-	if len(group_accounts) > 1:
-		indirect_income = [r for r in income if r.get("parent_account") == group_income_accounts[1].get("account")]
-		
-
-
-
- #  calculating the value of direct_account indirect_accounts
-	amount_total_direct_income=0.0		
-	for amount in direct_income:
-		amount_total_direct_income+=amount.get('total')
-
-
-	amount_total_direct_expense=0.0			
-	for amount in direct_expenses:
-		amount_total_direct_expense+=amount.get('total')
-
-	
-	amount_total_indirect_income=0.0			
-	for amount in indirect_income:
-		amount_total_indirect_income+=amount.get('total')
-
-	amount_total_indirect_expense=0.0			
-	for amount in indirect_expenses:
-		amount_total_indirect_expense+=amount.get('total')
-
-
-		
-
-
-	direct_profit_and_loss=(amount_total_direct_income)+(amount_total_direct_expense)
-	indirect_profit_and_loss=(amount_total_indirect_income)+(amount_total_indirect_expense)
-
-
-# make key for header
-
-	income[0].account_name = ""
-	expense[0].account_name = "Direct Incomes and Expenses"
-
-	direct_account = {'account_name': 'Gross Profit For Direct Incomes and Expenses', 'jun_2024': direct_profit_and_loss}
-	direct_profit_and_loss = {'indent': 0.0, 'currency': 'PKR', 'account_name': 'Direct Profit and Loss', 'jun_2024': direct_profit_and_loss, 'has_value': True, 'total': direct_profit_and_loss}
-
-
-
-
-
-	data.extend([direct_account] or [])
-			
-	if direct_expenses:
-		data.extend([group_accounts[0]] or [])
-		data.extend(direct_expenses or [])
-	if direct_income:
-		data.extend([group_income_accounts[0]] or [])
-		data.extend(direct_income or [])
-	
-	
-
-
-
-# direct account in row view with all accounts	
-	data.extend([direct_profit_and_loss] or [])
-
-	
-#in direct account in row view with all accounts
-	if indirect_expenses:
-		data.extend([group_accounts[1]] or [])
-		data.extend(indirect_expenses or [])
-	if indirect_income:
-		data.extend([group_income_accounts[1]] or [])
-		
-		data.extend(indirect_income or [])
-
-# whole year profit and loss
-
-
-
-
-
-
-	if net_profit_loss:
-		data.append(net_profit_loss)
-
 	columns = get_columns(
 		filters.periodicity, period_list, filters.accumulated_values, filters.company
 	)
+	
+	# column_name = "jun_2024"
+	ordinary_income =  {'account': 'Ordinary Income/Expense'}
+	direct_income = get_child_accounts(income, "Direct Income")
+	cost_of_goods_sold = [row for row in expense if row.get("account_type") == "Cost of Goods Sold"]
+	for row in cost_of_goods_sold:
+		row.indent = direct_income[0].get("indent")
 
-	chart = get_chart_data(filters, columns, income, expense, net_profit_loss)
+	gross_profit = {
+		"account": "Gross Profit",
+		'indent': 1.0,
+	}
 
-	currency = filters.presentation_currency or frappe.get_cached_value(
-		"Company", filters.company, "default_currency"
-	)
-	report_summary = get_report_summary(
-		period_list, filters.periodicity, income, expense, net_profit_loss, currency, filters
-	)
+	for column_name in columns:
+		column_name = column_name.get("fieldname")
+		get_accounts_difference(direct_income[0], cost_of_goods_sold[0], column_name, gross_profit)
 
-	return columns, data, None, chart, report_summary
+	direct_expense = get_child_accounts(expense, "Direct Expenses")
+	net_direct_profit = {
+		"account": "Net Ordinary Income",
+		'indent': 1.0,
+	}
+
+	for column_name in columns:
+		column_name = column_name.get("fieldname")
+		get_accounts_difference(gross_profit, direct_expense[0], column_name, net_direct_profit)
+
+	other_income =  {'account': 'Other Income/Expense'}
+	indirect_income = get_child_accounts(income, "Indirect Income")
+	indirect_expense = get_child_accounts(expense, "Indirect Expenses")
+	net_indirect_profit = {
+		"account": "Net Other Income",
+		'indent': 1.0,
+	}
+
+	for column_name in columns:
+		column_name = column_name.get("fieldname")
+		get_accounts_difference(indirect_income[0], indirect_expense[0], column_name, net_indirect_profit)
+
+	net_income = {
+		"account": "Net Income",
+		'indent': 0.0
+	}
+
+	for column_name in columns:
+		column_name = column_name.get("fieldname")
+		get_accounts_difference(net_direct_profit, net_indirect_profit, column_name, net_income)
+
+
+	temp_data = []
+	temp_data.append(ordinary_income)
+	temp_data.extend(direct_income)
+	temp_data.extend(cost_of_goods_sold)
+	temp_data.append(gross_profit)
+	temp_data.extend(direct_expense)
+	temp_data.append(net_direct_profit)
+	temp_data.append(other_income)
+	temp_data.extend(indirect_income)
+	temp_data.extend(indirect_expense)
+	temp_data.append(net_indirect_profit)
+	temp_data.append(net_income)
+
+	data = []
+	data.extend(income or [])
+	data.extend(expense or [])
+	
+	data = temp_data
+
+	return columns, data, None
+
+	# if net_profit_loss:
+	# 	data.append(net_profit_loss)
+
+	# chart = get_chart_data(filters, columns, income, expense, net_profit_loss)
+
+	# currency = filters.presentation_currency or frappe.get_cached_value(
+	# 	"Company", filters.company, "default_currency"
+	# )
+
+	# report_summary = get_report_summary(
+	# 	period_list, filters.periodicity, income, expense, net_profit_loss, currency, filters
+	# )
+
+	# return columns, data, None, chart, report_summary
+	
+def get_accounts_difference(account_1, account_2, column_name, result):
+	try:
+		if column_name in account_1 and column_name in account_2:
+			result[column_name] = float(account_1[column_name]) - float(account_2[column_name])
+	except ValueError:
+		pass
+
+def get_child_accounts(accounts, account):
+	flag = False
+	indent = None
+	child_accounts = [] 
+	for row in accounts:
+		if indent and row.get("indent") == indent and row.get("account_name") != account:
+			break
+
+		if row.get("account_name") == account:
+			flag = True
+			indent = row.get("indent")
+		
+		if flag and row.get("account") and row.get("account") not in ["Total Income (Credit)", "Total Expense (Debit)"]:
+			child_accounts.append(row)
+	
+	return child_accounts
 
 
 def get_report_summary(
 	period_list, periodicity, income, expense, net_profit_loss, currency, filters, consolidated=False
 ):
 	net_income, net_expense, net_profit = 0.0, 0.0, 0.0
-
 
 	# from consolidated financial statement
 	if filters.get("accumulated_in_group_company"):
@@ -245,17 +237,14 @@ def get_chart_data(filters, columns, income, expense, net_profit_loss):
 
 	income_data, expense_data, net_profit = [], [], []
 
-
-	for p in columns[2:]:
+	for p in columns[1:]:
 		if income:
 			income_data.append(income[-2].get(p.get("fieldname")))
-		
 		if expense:
 			expense_data.append(expense[-2].get(p.get("fieldname")))
-		
 		if net_profit_loss:
 			net_profit.append(net_profit_loss.get(p.get("fieldname")))
-		
+
 	datasets = []
 	if income_data:
 		datasets.append({"name": _("Income"), "values": income_data})
@@ -274,5 +263,3 @@ def get_chart_data(filters, columns, income, expense, net_profit_loss):
 	chart["fieldtype"] = "Currency"
 
 	return chart
-
-
